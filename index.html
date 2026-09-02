@@ -74,6 +74,7 @@
   @media (max-width:480px) { .minner { padding:18px; } .modal h2 { font-size:23px; } .mbody p { font-size:17px; } }
   /* ===== 앱 인트로/로그인 화면 ===== */
   .appscreen { position:fixed; inset:0; z-index:2000; display:flex; flex-direction:column; }
+  .appscreen[hidden] { display:none !important; }  /* hidden 속성이 flex보다 우선하도록 */
   #introScreen { background:#c0392b; align-items:center; justify-content:center; }
   #introVideo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#c0392b; }
   .intro-fallback { position:relative; z-index:1; text-align:center; color:#fff; animation:introPulse 2.2s ease-in-out infinite; }
@@ -329,6 +330,11 @@ function loginGoogle(){
 (function(){
   let authed=false; try{authed=!!localStorage.getItem('rcp_auth');}catch(e){}
   const vid=document.getElementById('introVideo');
+  const fb=document.querySelector('.intro-fallback');
+  if(vid && fb){  // 영상이 실제 재생되면 fallback 로고를 숨김(영상이 보이도록)
+    vid.addEventListener('playing', function(){ fb.style.display='none'; });
+    vid.addEventListener('error', function(){ fb.style.display='block'; });
+  }
   if(authed){
     if(vid) vid.addEventListener('ended', function(){ enterApp(localStorage.getItem('rcp_auth')||'guest'); });
     setTimeout(function(){ introEl.hidden=true; loginEl.hidden=true; }, 3500);
