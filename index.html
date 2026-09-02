@@ -70,6 +70,14 @@
   .writebox input, .writebox textarea { font:inherit; border:1px solid #dadde1; border-radius:8px; padding:9px 11px; width:100%; }
   .writebox textarea { min-height:70px; resize:vertical; }
   .writebox .wbtn { align-self:flex-end; background:#c0392b; color:#fff; border:none; border-radius:8px; padding:8px 20px; font:inherit; font-weight:600; cursor:pointer; }
+  /* 계정형 컴포저(페북/인스타 스타일) */
+  .composer { background:#fff; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.1); padding:12px 14px; margin-bottom:14px; }
+  .composer-top { display:flex; gap:10px; align-items:flex-start; }
+  .composer-top .avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; flex:0 0 40px; }
+  .composer-top textarea { flex:1; border:none; outline:none; resize:none; font:inherit; font-size:15px; min-height:44px; padding:9px 0; background:transparent; }
+  .composer-bar { display:flex; align-items:center; justify-content:space-between; border-top:1px solid #eceef0; margin-top:8px; padding-top:8px; }
+  .composer-name { font-size:13px; color:#65676b; font-weight:600; }
+  .composer .wbtn { background:#c0392b; color:#fff; border:none; border-radius:8px; padding:8px 22px; font:inherit; font-weight:700; cursor:pointer; }
   .ptext { font-size:15px; color:#1c1e21; line-height:1.7; margin:8px 0 12px; white-space:pre-wrap; }
   @media (max-width:480px) { .minner { padding:18px; } .modal h2 { font-size:23px; } .mbody p { font-size:17px; } }
   /* ===== 앱 인트로/로그인 화면 ===== */
@@ -198,18 +206,21 @@ function commCard(x){
     '<span class="readmore">자세히 →</span></div></article>';
 }
 function writeBox(){
-  return '<div class="writebox"><input id="w-name" placeholder="이름(선택)" maxlength="40">'+
-    '<input id="w-title" placeholder="제목" maxlength="120">'+
-    '<textarea id="w-text" placeholder="반려동물 이야기를 공유해보세요" maxlength="2000"></textarea>'+
-    '<button class="wbtn" onclick="submitPost()">글 등록</button></div>';
+  const name=getUser(); const initial=(name||'나')[0];
+  return '<div class="composer">'+
+    '<div class="composer-top"><div class="avatar" style="background:#c0392b;color:#fff">'+esc(initial)+'</div>'+
+    '<textarea id="w-text" placeholder="'+esc(name)+'님, 반려동물 이야기를 나눠보세요" maxlength="2000"></textarea></div>'+
+    '<div class="composer-bar"><span class="composer-name">'+esc(name)+' 님</span>'+
+    '<button class="wbtn" onclick="submitPost()">게시</button></div></div>';
 }
 async function submitPost(){
-  const name=document.getElementById('w-name').value, title=document.getElementById('w-title').value.trim(), text=document.getElementById('w-text').value.trim();
-  if(!title && !text){ return; }
+  const text=(document.getElementById('w-text')||{}).value; if(!text || !text.trim()) return;
+  const name=getUser(); const now=new Date().toISOString().slice(0,16).replace('T',' ');
   try{
-    const r=await(await fetch('/api/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,title,text})})).json();
+    const r=await(await fetch('/api/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,title:'',text:text.trim()})})).json();
     if(r.post){ COMM.unshift(r.post); render(); return; }
-  }catch(e){ COMM.unshift({key:'local:'+Date.now(),name:name||'익명',title,text,created_at:''}); render(); return; }
+  }catch(e){}
+  COMM.unshift({key:'local:'+Date.now(),name,title:'',text:text.trim(),created_at:now}); render();
 }
 function openComm(key){ const x=COMM.find(c=>c.key===key); if(!x)return; curKey=key; curType='comm'; track(key);
   document.getElementById('m-band').style.background='#8B5BEE';
@@ -319,17 +330,21 @@ const introEl=document.getElementById('introScreen'), loginEl=document.getElemen
 function isAuthed(){ try{return !!localStorage.getItem('rcp_auth');}catch(e){return false;} }
 function showApp(){ introEl.hidden=true; loginEl.hidden=true; }   // 로그인 없이 뉴스 열람
 function showLogin(){ introEl.hidden=true; loginEl.hidden=false; }
-function enterApp(method){ try{localStorage.setItem('rcp_auth',method);}catch(e){} introEl.hidden=true; loginEl.hidden=true; setTab('comm'); }
-function loginInstagram(){ alert('인스타그램 로그인은 백엔드 연동 후 제공됩니다. 지금은 게스트로 입장합니다.'); enterApp('instagram-pending'); }
+function getUser(){ try{return localStorage.getItem('rcp_user')||'사용자';}catch(e){return '사용자';} }
+function enterApp(method, name){ try{localStorage.setItem('rcp_auth',method); if(name) localStorage.setItem('rcp_user',name);}catch(e){} introEl.hidden=true; loginEl.hidden=true; setTab('comm'); }
+function loginInstagram(){ alert('인스타그램 로그인은 백엔드 연동 후 제공됩니다. 지금은 데모 계정으로 입장합니다.'); enterApp('instagram-pending','인스타 사용자'); }
 function loginGoogle(){
   if(window.google && GOOGLE_CLIENT_ID){
     try{
-      google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:function(resp){ enterApp('google'); }});
+      google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID, callback:function(resp){
+        let nm='구글 사용자'; try{ const p=JSON.parse(atob(resp.credential.split('.')[1])); nm=p.name||p.email||nm; }catch(e){}
+        enterApp('google', nm);
+      }});
       google.accounts.id.prompt();
       return;
     }catch(e){}
   }
-  enterApp('google-demo');  // 클라이언트 ID 미설정 시 데모 입장
+  enterApp('google-demo','구글 사용자');  // 클라이언트 ID 미설정 시 데모 입장
 }
 (function(){
   const vid=document.getElementById('introVideo');
